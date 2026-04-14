@@ -74,6 +74,12 @@ const getEvents = async (req, res, next) => {
   try {
     const { department, year, role, _id: userId } = req.user;
 
+    // ── Auto-mark past events as completed ────────────────────────────────────
+    await Event.updateMany(
+      { date: { $lt: new Date() }, status: "upcoming" },
+      { $set: { status: "completed" } }
+    );
+
     let events;
 
     if (role === "admin") {
@@ -99,12 +105,12 @@ const getEvents = async (req, res, next) => {
       ],
     }).sort({ date: 1 });
 
-    // ── FIX: preserve _id explicitly so frontend select works correctly ────────
+    // ── Preserve _id explicitly so frontend select works correctly ────────────
     const eventsWithStatus = events.map(ev => {
       const obj = ev.toObject();
       return {
         ...obj,
-        _id:          ev._id,          // ← keep original ObjectId, not virtual string
+        _id:          ev._id,
         isRegistered: ev.registeredStudents.some(
           id => id.toString() === userId.toString()
         ),
