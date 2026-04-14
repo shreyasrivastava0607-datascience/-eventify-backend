@@ -10,6 +10,12 @@ const students = [
   { rollNumber: '202510101150188', name: 'Achint',            password: 'Achint@183', department: 'CSE', year: 4 },
   { rollNumber: '202510101150210', name: 'Kanak Pandey',      password: 'Kanak@210',  department: 'ME',  year: 5 },
   { rollNumber: '202210101150202', name: 'Harshit Srivastava',password: 'Harshit@202',  department: 'CSE',  year: 4 },
+  { rollNumber: '202511201120018', name: 'Rijul Rai',         password: 'Rijul@018',  department: 'BBA',  year: 2 },
+  { rollNumber: '202511201120036', name: 'Bhanu Pratap Singh',password: 'Bhanu@036',  department: 'BBA',  year: 2 },
+  { rollNumber: '202510101150105', name: 'Arpita Singh',      password: 'Arpita@105',  department: 'CSE',  year: 1 },
+
+
+
 ];
 
 mongoose.connect(MONGO_URI).then(async () => {
