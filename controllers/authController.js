@@ -13,11 +13,14 @@ const adminCreateStudent = async (req, res) => {
       });
     }
 
-    const existing = await User.findOne({ rollNumber: rollNumber.toUpperCase() });
+    // Wrap in String() to prevent crashes if frontend sends an integer
+    const safeRollNumber = String(rollNumber).toUpperCase();
+
+    const existing = await User.findOne({ rollNumber: safeRollNumber });
     if (existing) {
       return res.status(409).json({
         success: false,
-        message: `A user with roll number ${rollNumber.toUpperCase()} already exists.`,
+        message: `A user with roll number ${safeRollNumber} already exists.`,
       });
     }
 
@@ -26,7 +29,7 @@ const adminCreateStudent = async (req, res) => {
     const defaultPass   = `${firstName}@123`;
 
     const newUser = new User({
-      rollNumber,
+      rollNumber: safeRollNumber,
       name: name.trim(),
       password:     defaultPass,  // Pre-save hook will hash this
       department,
@@ -65,7 +68,11 @@ const login = async (req, res) => {
       return res.status(400).json({ success: false, message: "Roll number and password are required." });
     }
 
-    const user = await User.findOne({ rollNumber: rollNumber.toUpperCase() }).select("+password");
+    // Wrap in String() for safety
+    const safeRollNumber = String(rollNumber).toUpperCase();
+    
+    // .select("+password") is correctly placed here!
+    const user = await User.findOne({ rollNumber: safeRollNumber }).select("+password");
 
     if (!user) {
       return res.status(401).json({ success: false, message: "Invalid roll number or password." });
@@ -76,6 +83,7 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, message: "Invalid roll number or password." });
     }
 
+    // If Render Environment Variables are set, this will now succeed!
     const token = user.generateToken();
 
     res.status(200).json({
@@ -95,6 +103,8 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
+    // If JWT_SECRET is still missing, this will catch the crash and output it
+    console.error("Login Error:", error.message); 
     res.status(500).json({ success: false, message: error.message });
   }
 };
