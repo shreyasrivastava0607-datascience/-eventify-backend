@@ -1,19 +1,19 @@
 const bcrypt = require("bcrypt");
 const User   = require("../models/User");
 
-// ─── Admin: Create Student Account ───────────────────────────────────────────
+/* ── Admin: Create Student/User Account ── */
 const adminCreateStudent = async (req, res) => {
   try {
-    const { rollNumber, department, year, role } = req.body;
+    const { rollNumber, name, department, year, role } = req.body;
 
-    if (!rollNumber || !department || !year) {
+    if (!rollNumber || !department || !year || !name) {
       return res.status(400).json({
         success: false,
-        message: "rollNumber, department, and year are required.",
+        message: "rollNumber, name, department, and year are required.",
       });
     }
 
-   const existing = await User.findOne({ rollNumber: rollNumber.toUpperCase() });
+    const existing = await User.findOne({ rollNumber: rollNumber.toUpperCase() });
     if (existing) {
       return res.status(409).json({
         success: false,
@@ -21,11 +21,14 @@ const adminCreateStudent = async (req, res) => {
       });
     }
 
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash("123", salt);
+    // Default password = FirstName@123
+    const firstName     = name.trim().split(' ')[0];
+    const defaultPass   = `${firstName}@123`;
+
     const newUser = new User({
       rollNumber,
-      password: hashedPassword,
+      name: name.trim(),
+      password:     defaultPass,  // Pre-save hook will hash this
       department,
       year,
       role:         role || "student",
@@ -36,10 +39,11 @@ const adminCreateStudent = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Student account created. Default password is '123'.",
+      message: `User created. Default password: ${defaultPass}`,
       data: {
         id:           newUser._id,
         rollNumber:   newUser.rollNumber,
+        name:         newUser.name,
         department:   newUser.department,
         year:         newUser.year,
         role:         newUser.role,
@@ -52,35 +56,24 @@ const adminCreateStudent = async (req, res) => {
   }
 };
 
-// ─── Login ────────────────────────────────────────────────────────────────────
+/* ── Login ── */
 const login = async (req, res) => {
   try {
     const { rollNumber, password } = req.body;
 
     if (!rollNumber || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Roll number and password are required.",
-      });
+      return res.status(400).json({ success: false, message: "Roll number and password are required." });
     }
 
-    const user = await User.findOne({
-      rollNumber: rollNumber.toUpperCase(),
-    }).select("+password");
+    const user = await User.findOne({ rollNumber: rollNumber.toUpperCase() }).select("+password");
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid roll number or password.",
-      });
+      return res.status(401).json({ success: false, message: "Invalid roll number or password." });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid roll number or password.",
-      });
+      return res.status(401).json({ success: false, message: "Invalid roll number or password." });
     }
 
     const token = user.generateToken();
@@ -94,6 +87,7 @@ const login = async (req, res) => {
       user: {
         id:         user._id,
         rollNumber: user.rollNumber,
+        name:       user.name,
         role:       user.role,
         department: user.department,
         year:       user.year,
@@ -105,28 +99,27 @@ const login = async (req, res) => {
   }
 };
 
-// ─── Change Password ──────────────────────────────────────────────────────────
+/* ── Change Password ── */
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: "Current password and new password are required.",
-      });
+      return res.status(400).json({ success: false, message: "Current password and new password are required." });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: "New password must be at least 6 characters." });
     }
 
     const user = await User.findById(req.user._id).select("+password");
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Current password is incorrect.",
-      });
+      return res.status(401).json({ success: false, message: "Current password is incorrect." });
     }
 
+    // Hash manually and update directly to avoid pre-save hook double-hashing
     const salt        = await bcrypt.genSalt(12);
     const hashedPass  = await bcrypt.hash(newPassword, salt);
 
@@ -135,16 +128,14 @@ const changePassword = async (req, res) => {
       { password: hashedPass, isFirstLogin: false }
     );
 
-    const token = user.generateToken();
+    const updatedUser = await User.findById(req.user._id);
+    const token       = updatedUser.generateToken();
 
-    res.status(200).json({
-      success: true,
-      message: "Password changed successfully.",
-      token,
-    });
+    res.status(200).json({ success: true, message: "Password changed successfully.", token });
 
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 module.exports = { adminCreateStudent, login, changePassword };
